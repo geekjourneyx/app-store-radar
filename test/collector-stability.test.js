@@ -4,6 +4,7 @@ import { mkdtemp, access } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { collectDay, selectReviewWatchlist } from '../src/collect.js';
+import { createAppleClient } from '../src/apple.js';
 
 test('review watchlist is bounded per storefront while preserving diverse search seeds and charts', () => {
   const search = [];
@@ -75,4 +76,22 @@ test('collector rejects unhealthy discovery and does not write a partition', asy
     /INSUFFICIENT_DISCOVERY_HEALTH/
   );
   await assert.rejects(() => access(path.join(root, 'data/2026/09/08')));
+});
+
+test('Apple review client accepts singleton review entry and ignores app metadata entries', async () => {
+  const responses = [
+    { feed:{ entry:{ id:{label:'review-1'}, 'im:rating':{label:'5'}, content:{label:'great'} } } },
+    { feed:{ entry:{ id:{label:'app-meta'}, 'im:name':{label:'Some App'} } } }
+  ];
+  let calls = 0;
+  const fetchImpl = async () => ({
+    ok:true,
+    async json() { return responses[calls++]; }
+  });
+  const client = createAppleClient({ fetchImpl, timeoutMs:1000, retries:0 });
+  const first = await client.fetchReviews('1', 'cn', 1);
+  assert.equal(first.feed.entry.length, 1);
+  assert.equal(first.feed.entry[0]['im:rating'].label, '5');
+  const second = await client.fetchReviews('2', 'cn', 1);
+  assert.deepEqual(second.feed.entry, []);
 });
