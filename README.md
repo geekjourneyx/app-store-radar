@@ -1,4 +1,6 @@
-# App Store Radar
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%" alt="App Store Radar turns public App Store signals into evidence-backed BUILD, WATCH, or REJECT product opportunity verdicts.">
+</p>
 
 Find product opportunities from **real App Store demand, unmet needs, market momentum, and build feasibility — not popularity alone**.
 
