@@ -1,6 +1,8 @@
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
 
-export function createAppleClient({ fetchImpl = fetch, timeoutMs = 15000, retries = 2 } = {}) {
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+export function createAppleClient({ fetchImpl = fetch, timeoutMs = 10000, retries = 1, retryDelayMs = 300 } = {}) {
   async function getJson(url) {
     let last;
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -21,6 +23,7 @@ export function createAppleClient({ fetchImpl = fetch, timeoutMs = 15000, retrie
         last = err;
         if (attempt === retries) throw err;
       }
+      if (attempt < retries) await sleep(retryDelayMs * (attempt + 1));
     }
     throw last;
   }
@@ -41,7 +44,7 @@ export function createAppleClient({ fetchImpl = fetch, timeoutMs = 15000, retrie
       u.searchParams.set('entity', 'software');
       return getJson(u);
     },
-    async fetchReviews(appId, storefront, maxPages = 2) {
+    async fetchReviews(appId, storefront, maxPages = 1) {
       const entries = [];
       for (let page = 1; page <= maxPages; page++) {
         const url = `https://itunes.apple.com/${storefront}/rss/customerreviews/page=${page}/id=${appId}/sortby=mostrecent/json`;
