@@ -6,10 +6,11 @@ permissions:
   contents: write
 concurrency:
   group: app-store-radar-daily-smoke
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
