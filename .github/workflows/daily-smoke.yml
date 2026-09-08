@@ -5,7 +5,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: app-store-radar-daily-smoke
+  group: app-store-radar-daily-smoke-v2
   cancel-in-progress: true
 jobs:
   smoke:
