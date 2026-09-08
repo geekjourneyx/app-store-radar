@@ -60,6 +60,27 @@ export async function listPartitions(root) {
   return out.sort();
 }
 
+export async function readKnownReviewIds(root) {
+  const ids = new Set();
+  for (const dir of await listPartitions(root)) {
+    let text;
+    try {
+      text = await readFile(path.join(dir, 'reviews.ndjson'), 'utf8');
+    } catch (e) {
+      if (e.code === 'ENOENT') continue;
+      throw e;
+    }
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      const row = JSON.parse(line);
+      if (row.storefront && row.app_id && row.review_id) {
+        ids.add(`${row.storefront}:${row.app_id}:${row.review_id}`);
+      }
+    }
+  }
+  return ids;
+}
+
 export async function readHistory(root) {
   const partitions = await listPartitions(root);
   const days = [];
