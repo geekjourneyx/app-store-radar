@@ -17,10 +17,11 @@ jobs:
         with: { node-version: 22 }
       - run: npm test
       - name: Collect evidence
-        run: npm run collect -- --date 2026-09-08
+        run: npm run collect -- --date 2026-09-08 --root /tmp/app-store-radar-smoke
       - name: Inspect output
         run: |
+          ROOT=/tmp/app-store-radar-smoke/data/2026/09/08
           echo '--- generated files ---'
-          find data/2026/09/08 -maxdepth 1 -type f -print -exec wc -l {} \;
+          find "$ROOT" -maxdepth 1 -type f -print -exec wc -l {} \;
           echo '--- manifest ---'
-          cat data/2026/09/08/manifest.json
+          cat "$ROOT/manifest.json"
