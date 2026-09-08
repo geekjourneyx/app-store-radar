@@ -23,6 +23,7 @@
   "review_chart_apps_per_type": 10,
   "max_review_apps_per_storefront": 50,
   "review_concurrency": 4,
+  "min_discovery_success_ratio": 0.8,
   "chart_types": ["top-free", "top-paid"],
   "thresholds": {"min_demand":2,"min_gap":2,"min_cross_apps":2,"min_persistence_days":2}
 }
