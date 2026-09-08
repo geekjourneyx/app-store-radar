@@ -1,0 +1,29 @@
+name: Weekly opportunity report
+on:
+  schedule:
+    - cron: '47 2 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: app-store-radar-weekly
+  cancel-in-progress: false
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm test
+      - run: npm run weekly -- --date "$(date -u +%F)"
+      - name: Commit weekly report
+        run: |
+          if git diff --quiet && [ -z "$(git status --porcelain)" ]; then exit 0; fi
+          git config user.name "app-store-radar-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add evidence reports
+          git commit -m "report: weekly App Store opportunities $(date -u +%G-W%V)"
+          git pull --rebase origin main
+          git push origin HEAD:main
