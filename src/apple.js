@@ -2,6 +2,12 @@ const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
+function reviewEntries(json) {
+  const raw = json.feed?.entry;
+  const entries = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  return entries.filter((entry) => entry?.['im:rating']);
+}
+
 export function createAppleClient({ fetchImpl = fetch, timeoutMs = 10000, retries = 1, retryDelayMs = 300 } = {}) {
   async function getJson(url) {
     let last;
@@ -49,7 +55,7 @@ export function createAppleClient({ fetchImpl = fetch, timeoutMs = 10000, retrie
       for (let page = 1; page <= maxPages; page++) {
         const url = `https://itunes.apple.com/${storefront}/rss/customerreviews/page=${page}/id=${appId}/sortby=mostrecent/json`;
         const json = await getJson(url);
-        entries.push(...(json.feed?.entry ?? []).slice(1));
+        entries.push(...reviewEntries(json));
       }
       return { feed: { entry: entries } };
     },
