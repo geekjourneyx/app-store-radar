@@ -2,6 +2,8 @@
   <img src="./assets/readme/hero.svg" width="100%" alt="App Store Radar turns public App Store signals into evidence-backed BUILD, WATCH, or REJECT product opportunity verdicts.">
 </p>
 
+# App Store Radar
+
 Find product opportunities from **real App Store demand, unmet needs, market momentum, and build feasibility — not popularity alone**.
 
 App Store Radar turns public App Store signals into a weekly `BUILD / WATCH / REJECT` report for product discovery.
@@ -41,7 +43,7 @@ Daily evidence snapshots
           ↓
 Historical deltas + noise filtering
           ↓
-Weekly opportunity analysis
+Weekly opportunity research
           ↓
 BUILD / WATCH / REJECT
 ```
@@ -70,13 +72,12 @@ No database, dashboard, paid API, or secret is required for the baseline pipelin
 
 ## Automation
 
-GitHub Actions runs the pipeline unattended:
+The unattended pipeline has two responsibilities:
 
-- daily collection builds the historical evidence base;
-- weekly analysis generates the opportunity report;
-- pull requests run the test suite before merge.
+- **GitHub Actions** runs daily collection to build the historical evidence base and runs CI on pull requests and `main`.
+- **ChatGPT** runs the weekly opportunity research: it reads the accumulated evidence, performs external validation and counter-evidence checks, updates the weekly report, opens a PR, verifies CI, and merges only validated changes.
 
-Both collection and reporting workflows can also be started manually with `workflow_dispatch`.
+Daily collection can also be started manually with `workflow_dispatch`.
 
 ## Data
 
