@@ -17,7 +17,15 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm test
-      - run: npm run collect -- --date "$(date -u +%F)"
+      - name: Collect today's evidence once
+        run: |
+          DATE="$(date -u +%F)"
+          PARTITION="data/$(date -u +%Y)/$(date -u +%m)/$(date -u +%d)"
+          if [ -d "$PARTITION" ]; then
+            echo "Partition $PARTITION already exists; leaving immutable history unchanged."
+            exit 0
+          fi
+          npm run collect -- --date "$DATE"
       - name: Commit new evidence
         run: |
           if git diff --quiet && [ -z "$(git status --porcelain)" ]; then exit 0; fi
