@@ -1,0 +1,12 @@
+{
+  "name": "app-store-radar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "test": "node --test",
+    "collect": "node src/cli.js collect",
+    "weekly": "node src/cli.js weekly"
+  }
+}

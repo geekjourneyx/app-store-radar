@@ -1,0 +1,24 @@
+{
+  "storefronts": ["us", "cn", "jp"],
+  "seeds": [
+    {"query":"voice notes","kind":"job"},
+    {"query":"habit tracker","kind":"job"},
+    {"query":"expense tracker","kind":"job"},
+    {"query":"journal","kind":"job"},
+    {"query":"meal planner","kind":"job"},
+    {"query":"focus timer","kind":"job"},
+    {"query":"receipt scanner","kind":"job"},
+    {"query":"language learning","kind":"job"},
+    {"query":"travel planner","kind":"job"},
+    {"query":"photo editor","kind":"job"},
+    {"query":"video editor","kind":"job"},
+    {"query":"calendar","kind":"job"},
+    {"query":"sleep tracker","kind":"job"},
+    {"query":"fitness","kind":"job"},
+    {"query":"pdf scanner","kind":"job"}
+  ],
+  "search_limit": 50,
+  "reviews_per_app": 100,
+  "chart_types": ["top-free", "top-paid"],
+  "thresholds": {"min_demand":2,"min_gap":2,"min_cross_apps":2,"min_persistence_days":2}
+}
