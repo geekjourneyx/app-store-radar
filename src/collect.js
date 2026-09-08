@@ -1,5 +1,5 @@
 import { normalizeApps, normalizeChart, normalizeReviews, normalizeSearch } from './normalize.js';
-import { writePartition } from './storage.js';
+import { readKnownReviewIds, writePartition } from './storage.js';
 
 function uniq(rows, key) {
   const map = new Map();
@@ -59,6 +59,7 @@ export async function collectDay({ date, config, client, root = '.' }) {
   const search = [], charts = [], apps = [], reviews = [], failures = [];
   const sourceSuccess = { search: 0, chart: 0, lookup: 0, reviews: 0 };
   let successes = 0;
+  let reviewRowsFetched = 0;
   const tracked = new Map();
 
   for (const storefront of config.storefronts) {
@@ -118,11 +119,19 @@ export async function collectDay({ date, config, client, root = '.' }) {
     maxApps: config.max_review_apps_per_storefront ?? 50
   }));
   const pages = Math.max(1, Math.ceil((config.reviews_per_app ?? 50) / 50));
+  const knownReviewIds = await readKnownReviewIds(root);
 
   await mapLimit(reviewWatchlist, config.review_concurrency ?? 4, async (item) => {
     try {
-      const rows = normalizeReviews(await client.fetchReviews(item.app_id, item.storefront, pages), { appId: item.app_id, storefront: item.storefront });
-      reviews.push(...rows.slice(0, config.reviews_per_app ?? 50));
+      const rows = normalizeReviews(await client.fetchReviews(item.app_id, item.storefront, pages), { appId: item.app_id, storefront: item.storefront })
+        .slice(0, config.reviews_per_app ?? 50);
+      reviewRowsFetched += rows.length;
+      for (const row of rows) {
+        const key = `${row.storefront}:${row.app_id}:${row.review_id}`;
+        if (knownReviewIds.has(key)) continue;
+        knownReviewIds.add(key);
+        reviews.push(row);
+      }
       sourceSuccess.reviews++;
       successes++;
     } catch (e) {
@@ -132,10 +141,11 @@ export async function collectDay({ date, config, client, root = '.' }) {
 
   if (!successes) throw new Error('NO_SUCCESSFUL_SOURCES');
 
+  const uniqueReviews = uniq(reviews, (r) => `${r.storefront}:${r.app_id}:${r.review_id}`);
   const payload = {
     apps: uniq(apps, (r) => `${r.storefront}:${r.app_id}`),
     search: uniq(search, (r) => `${r.storefront}:${r.query}:${r.app_id}`),
-    reviews: uniq(reviews, (r) => `${r.storefront}:${r.review_id}`),
+    reviews: uniqueReviews,
     charts: uniq(charts, (r) => `${r.storefront}:${r.chart_type}:${r.app_id}`),
     manifest: {
       date,
@@ -151,9 +161,11 @@ export async function collectDay({ date, config, client, root = '.' }) {
       counts: {
         tracked_apps: tracked.size,
         review_watchlist_apps: reviewWatchlist.length,
+        review_rows_fetched: reviewRowsFetched,
+        reviews_new: uniqueReviews.length,
         apps: apps.length,
         search: search.length,
-        reviews: reviews.length,
+        reviews: uniqueReviews.length,
         charts: charts.length
       }
     }
