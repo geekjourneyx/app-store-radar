@@ -83,8 +83,3 @@ data/YYYY/MM/DD/        daily evidence partitions
 evidence/YYYY-Www.json  weekly machine-readable evidence
 reports/YYYY-Www.md     weekly human-readable report
 ```
-
-## Design
-
-- [Opportunity Radar design](./docs/superpowers/specs/2026-09-08-app-store-opportunity-radar-design.md)
-- [Implementation plan](./docs/superpowers/plans/2026-09-08-app-store-opportunity-radar.md)
