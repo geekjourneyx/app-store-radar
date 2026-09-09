@@ -1,0 +1,25 @@
+{
+  "date": "2026-09-09",
+  "successes": 228,
+  "source_success": {
+    "search": 45,
+    "chart": 6,
+    "lookup": 27,
+    "reviews": 150
+  },
+  "failures": [],
+  "health": {
+    "discovery_successes": 51,
+    "discovery_attempts": 51,
+    "discovery_success_ratio": 1,
+    "minimum_discovery_success_ratio": 0.8
+  },
+  "counts": {
+    "tracked_apps": 2465,
+    "review_watchlist_apps": 150,
+    "apps": 2465,
+    "search": 1966,
+    "reviews": 6529,
+    "charts": 599
+  }
+}
