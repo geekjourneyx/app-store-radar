@@ -30,7 +30,6 @@ export function normalizeApps(json, storefront) {
     version: r.version ?? null,
     release_date: r.currentVersionReleaseDate ?? null,
     release_notes: r.releaseNotes ?? null,
-    description: r.description ?? null,
     url: r.trackViewUrl ?? null
   }));
 }
