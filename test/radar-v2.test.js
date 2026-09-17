@@ -93,6 +93,22 @@ test('daily evidence renders a readable decision-oriented markdown report', asyn
   assert.match(stored, /Tiny Tool/);
 });
 
+test('daily report derives chart integrity when legacy manifest lacks integrity data', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'radar-legacy-health-'));
+  await writePartition(root, '2026-09-17', {
+    apps:[], search:[], reviews:[],
+    charts:Array.from({ length:99 }, (_, i) => ({ storefront:'cn', chart_type:'top-paid', app_id:String(i+1), app_name:`App ${i+1}`, chart_position:i+1 })),
+    manifest:{ date:'2026-09-17', failures:[], health:{} }
+  });
+  const evidence = await buildDailyEvidence({ root, date:new Date('2026-09-17T00:00:00Z'), config:{} });
+  assert.equal(evidence.collection_health.chart_integrity_status, 'derived');
+  assert.equal(evidence.collection_health.chart_integrity[0].complete, false);
+  assert.deepEqual(evidence.collection_health.chart_integrity[0].missing_positions, [100]);
+  const md = renderDailyMarkdown(evidence);
+  assert.match(md, /Incomplete charts: \*\*1\*\*/);
+  assert.match(md, /derived from raw chart rows/);
+});
+
 test('weekly output is stored under explicit weekly evidence and report directories', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'radar-weekly-'));
   await writePartition(root, '2026-09-17', { apps:[], search:[], charts:[], reviews:[], manifest:{ date:'2026-09-17', failures:[] } });
