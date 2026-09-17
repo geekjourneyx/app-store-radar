@@ -22,13 +22,17 @@ export function normalizeApps(json, storefront) {
     primary_genre: r.primaryGenreName ?? null,
     genres: r.genres ?? [],
     price: r.price ?? null,
+    formatted_price: r.formattedPrice ?? null,
     currency: r.currency ?? null,
+    price_model: Number(r.price ?? 0) > 0 ? 'paid' : 'free',
     average_rating: r.averageUserRating ?? null,
     rating_count: r.userRatingCount ?? null,
     current_version_rating: r.averageUserRatingForCurrentVersion ?? null,
     current_version_rating_count: r.userRatingCountForCurrentVersion ?? null,
     version: r.version ?? null,
+    initial_release_date: r.releaseDate ?? null,
     release_date: r.currentVersionReleaseDate ?? null,
+    minimum_os_version: r.minimumOsVersion ?? null,
     release_notes: r.releaseNotes ?? null,
     url: r.trackViewUrl ?? null
   }));

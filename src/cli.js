@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createAppleClient } from './apple.js';
 import { collectDay } from './collect.js';
+import { writeDaily } from './daily-report.js';
 import { writeWeekly } from './report.js';
 
 const args = process.argv.slice(2);
@@ -15,8 +16,9 @@ const config = JSON.parse(await readFile(new URL('../config/radar.json', import.
 
 try {
   if (cmd === 'collect') await collectDay({ date: dateStr, config, client: createAppleClient(), root });
+  else if (cmd === 'daily') await writeDaily({ root, date, config });
   else if (cmd === 'weekly') await writeWeekly({ root, date, config });
-  else throw new Error('Usage: node src/cli.js <collect|weekly> [--date YYYY-MM-DD] [--root PATH]');
+  else throw new Error('Usage: node src/cli.js <collect|daily|weekly> [--date YYYY-MM-DD] [--root PATH]');
 } catch (e) {
   console.error(e.code ?? e.message);
   process.exitCode = 1;

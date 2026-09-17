@@ -1,29 +1,30 @@
-const RULES = [
-  { category: 'integration gap', job: 'data portability', re: /\b(export|markdown|obsidian|logseq|local files?|api)\b/i },
-  { category: 'pricing gap', job: 'affordable ownership', re: /\b(subscription|too expensive|price|lifetime|one[- ]time)\b/i },
-  { category: 'workflow gap', job: 'offline/private workflow', re: /\b(offline|local[- ]first|privacy|without cloud)\b/i },
-  { category: 'bug/regression', job: 'reliability', re: /\b(crash|login|won't open|broken|battery drain)\b/i }
-];
+import { extractReviewSignals } from './review-signals.js';
 
 function daysBetween(a, b) {
   return Math.abs((new Date(a) - new Date(b)) / 86400000);
 }
 
+const ECONOMIC_JOBS = new Set([
+  'affordable ownership',
+  'data portability',
+  'offline/private workflow',
+  'local/private workflow',
+  'ad-free experience',
+  'focused workflow',
+  'learning transfer'
+]);
+
 export function evaluateCandidates({ history, signals, config = { thresholds: {} } }) {
   const matched = [];
   for (const day of history) {
-    for (const review of day.reviews) {
-      const text = `${review.title} ${review.body}`;
-      for (const rule of RULES) {
-        if (rule.re.test(text)) matched.push({ ...review, date: day.date, category: rule.category, job: rule.job });
-      }
-    }
+    for (const signal of extractReviewSignals(day.reviews ?? [])) matched.push({ ...signal, date: day.date });
   }
 
   const groups = new Map();
   for (const item of matched) {
-    if (!groups.has(item.job)) groups.set(item.job, []);
-    groups.get(item.job).push(item);
+    const job = item.job === 'local/private workflow' ? 'offline/private workflow' : item.job;
+    if (!groups.has(job)) groups.set(job, []);
+    groups.get(job).push({ ...item, job });
   }
 
   const results = [];
@@ -31,16 +32,17 @@ export function evaluateCandidates({ history, signals, config = { thresholds: {}
     const apps = new Set(rows.map((r) => `${r.storefront}:${r.app_id}`));
     const dates = [...new Set(rows.map((r) => r.date))].sort();
     const demand = rows.length;
-    const gap = rows.filter((r) => r.category !== 'bug/regression').length;
-    const incident = rows.filter((r) => r.category === 'bug/regression').length >= Math.max(3, Math.ceil(rows.length * 0.7)) && dates.length <= 2;
+    const gap = rows.filter((r) => r.intent !== 'value').length;
+    const reliabilityRows = rows.filter((r) => r.category === 'bug/regression').length;
+    const incident = job === 'reliability' && reliabilityRows >= Math.max(3, Math.ceil(rows.length * 0.7)) && dates.length <= 2;
     const min = config.thresholds ?? {};
     const gates = {
       demand: demand >= (min.min_demand ?? 2),
       gap: gap >= (min.min_gap ?? 2),
       cross_app: apps.size >= (min.min_cross_apps ?? 2),
       persistence: dates.length >= (min.min_persistence_days ?? 2) && (!dates.length || daysBetween(dates[0], dates.at(-1)) >= 1),
-      feasibility: true,
-      economics: ['affordable ownership', 'data portability', 'offline/private workflow'].includes(job)
+      feasibility: job !== 'reliability',
+      economics: ECONOMIC_JOBS.has(job)
     };
     const allGates = Object.values(gates).every(Boolean);
     const noise_flags = incident ? ['VERSION_INCIDENT'] : [];
@@ -51,10 +53,11 @@ export function evaluateCandidates({ history, signals, config = { thresholds: {}
     results.push({
       id: job.replace(/\W+/g, '-'),
       observed: {
-        review_ids: rows.map((r) => r.review_id),
+        review_ids: [...new Set(rows.map((r) => r.review_id))],
         apps: [...apps],
         dates,
-        categories: [...new Set(rows.map((r) => r.category))]
+        categories: [...new Set(rows.map((r) => r.category))],
+        evidence: rows.slice(0, 8).map((r) => ({ review_id:r.review_id, app_id:r.app_id, storefront:r.storefront, rating:r.rating, intent:r.intent, excerpt:r.evidence_excerpt }))
       },
       computed: {
         demand_observations: demand,
@@ -70,7 +73,8 @@ export function evaluateCandidates({ history, signals, config = { thresholds: {}
       noise_flags,
       gates,
       score,
-      verdict
+      verdict,
+      confidence: 'machine-triage'
     });
   }
   return results.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));

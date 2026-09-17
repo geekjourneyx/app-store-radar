@@ -1,0 +1,33 @@
+name: Weekly App Store radar baseline
+on:
+  schedule:
+    - cron: '15 2 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: app-store-radar-weekly
+  cancel-in-progress: false
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm test
+      - name: Render seven-day evidence baseline
+        run: |
+          DATE="$(TZ=Asia/Shanghai date +%F)"
+          npm run weekly -- --date "$DATE"
+      - name: Commit weekly machine evidence
+        run: |
+          if git diff --quiet && [ -z "$(git status --porcelain)" ]; then exit 0; fi
+          git config user.name "app-store-radar-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add evidence/weekly reports/weekly
+          git commit -m "radar: weekly baseline $(TZ=Asia/Shanghai date +%G-W%V)"
+          git pull --rebase origin main
+          git push origin HEAD:main

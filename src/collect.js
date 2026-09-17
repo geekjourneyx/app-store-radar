@@ -20,39 +20,95 @@ async function mapLimit(items, limit, worker) {
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, run));
 }
 
+export function inspectChartIntegrity(charts, { storefronts, chartTypes, expectedCount = 100 }) {
+  const output = [];
+  for (const storefront of storefronts) {
+    for (const chartType of chartTypes) {
+      const positions = new Set(
+        charts
+          .filter((r) => r.storefront === storefront && r.chart_type === chartType)
+          .map((r) => Number(r.chart_position))
+          .filter(Number.isFinite)
+      );
+      const missing = [];
+      for (let i = 1; i <= expectedCount; i++) if (!positions.has(i)) missing.push(i);
+      output.push({
+        storefront,
+        chart_type: chartType,
+        expected_count: expectedCount,
+        observed_count: positions.size,
+        missing_positions: missing,
+        complete: missing.length === 0
+      });
+    }
+  }
+  return output;
+}
+
 export function selectReviewWatchlist({
   search,
   charts,
   storefront,
   searchPerSeed = 2,
   chartPerType = 10,
+  chartLimits = null,
+  chartPriority = null,
   maxApps = 50
 }) {
   const selected = new Map();
-  const add = (row) => {
+  const add = (row, source) => {
     if (!row?.app_id || selected.size >= maxApps) return;
-    selected.set(`${storefront}:${row.app_id}`, { storefront, app_id: row.app_id });
+    const key = `${storefront}:${row.app_id}`;
+    if (!selected.has(key)) selected.set(key, { storefront, app_id: row.app_id, source });
   };
 
-  const queries = [...new Set(search.filter((r) => r.storefront === storefront).map((r) => r.query))];
-  for (const query of queries) {
-    search
-      .filter((r) => r.storefront === storefront && r.query === query)
-      .sort((a, b) => a.discovery_position - b.discovery_position)
-      .slice(0, searchPerSeed)
-      .forEach(add);
-  }
+  const addSearch = () => {
+    const queries = [...new Set(search.filter((r) => r.storefront === storefront).map((r) => r.query))];
+    for (const query of queries) {
+      search
+        .filter((r) => r.storefront === storefront && r.query === query)
+        .sort((a, b) => a.discovery_position - b.discovery_position)
+        .slice(0, searchPerSeed)
+        .forEach((row) => add(row, `search:${query}`));
+    }
+  };
 
-  const chartTypes = [...new Set(charts.filter((r) => r.storefront === storefront).map((r) => r.chart_type))];
-  for (const chartType of chartTypes) {
-    charts
-      .filter((r) => r.storefront === storefront && r.chart_type === chartType)
-      .sort((a, b) => a.chart_position - b.chart_position)
-      .slice(0, chartPerType)
-      .forEach(add);
+  const availableTypes = [...new Set(charts.filter((r) => r.storefront === storefront).map((r) => r.chart_type))];
+  const orderedTypes = chartPriority?.length
+    ? [...chartPriority.filter((t) => availableTypes.includes(t)), ...availableTypes.filter((t) => !chartPriority.includes(t))]
+    : availableTypes;
+  const addCharts = () => {
+    for (const chartType of orderedTypes) {
+      const limit = chartLimits?.[chartType] ?? chartPerType;
+      charts
+        .filter((r) => r.storefront === storefront && r.chart_type === chartType)
+        .sort((a, b) => a.chart_position - b.chart_position)
+        .slice(0, limit)
+        .forEach((row) => add(row, `chart:${chartType}`));
+    }
+  };
+
+  // Explicit per-chart limits are a signal that chart coverage is the primary contract.
+  if (chartLimits) {
+    addCharts();
+    addSearch();
+  } else {
+    addSearch();
+    addCharts();
   }
 
   return [...selected.values()].slice(0, maxApps);
+}
+
+function reviewPolicy(config, storefront) {
+  const explicit = config.review_watchlists?.[storefront] ?? config.review_watchlists?.default ?? null;
+  return {
+    searchPerSeed: explicit?.search_per_seed ?? config.review_search_apps_per_seed ?? 2,
+    chartPerType: explicit?.chart_per_type ?? config.review_chart_apps_per_type ?? 10,
+    chartLimits: explicit?.chart_limits ?? null,
+    chartPriority: explicit?.chart_priority ?? null,
+    maxApps: explicit?.max_apps ?? config.max_review_apps_per_storefront ?? 50
+  };
 }
 
 export async function collectDay({ date, config, client, root = '.' }) {
@@ -76,7 +132,7 @@ export async function collectDay({ date, config, client, root = '.' }) {
     }
     for (const chartType of config.chart_types) {
       try {
-        const rows = normalizeChart(await client.fetchChart(storefront, chartType, 100), { storefront, chartType });
+        const rows = normalizeChart(await client.fetchChart(storefront, chartType, config.chart_expected_count ?? 100), { storefront, chartType });
         charts.push(...rows);
         rows.forEach((r) => tracked.set(`${storefront}:${r.app_id}`, { storefront, app_id: r.app_id }));
         sourceSuccess.chart++;
@@ -110,14 +166,10 @@ export async function collectDay({ date, config, client, root = '.' }) {
     }
   }
 
-  const reviewWatchlist = config.storefronts.flatMap((storefront) => selectReviewWatchlist({
-    search,
-    charts,
-    storefront,
-    searchPerSeed: config.review_search_apps_per_seed ?? 2,
-    chartPerType: config.review_chart_apps_per_type ?? 10,
-    maxApps: config.max_review_apps_per_storefront ?? 50
-  }));
+  const reviewWatchlist = config.storefronts.flatMap((storefront) => {
+    const policy = reviewPolicy(config, storefront);
+    return selectReviewWatchlist({ search, charts, storefront, ...policy });
+  });
   const pages = Math.max(1, Math.ceil((config.reviews_per_app ?? 50) / 50));
   const knownReviewIds = await readKnownReviewIds(root);
 
@@ -142,6 +194,12 @@ export async function collectDay({ date, config, client, root = '.' }) {
   if (!successes) throw new Error('NO_SUCCESSFUL_SOURCES');
 
   const uniqueReviews = uniq(reviews, (r) => `${r.storefront}:${r.app_id}:${r.review_id}`);
+  const chartIntegrity = inspectChartIntegrity(charts, {
+    storefronts: config.storefronts,
+    chartTypes: config.chart_types,
+    expectedCount: config.chart_expected_count ?? 100
+  });
+  const completeCharts = chartIntegrity.filter((x) => x.complete).length;
   const payload = {
     apps: uniq(apps, (r) => `${r.storefront}:${r.app_id}`),
     search: uniq(search, (r) => `${r.storefront}:${r.query}:${r.app_id}`),
@@ -156,7 +214,9 @@ export async function collectDay({ date, config, client, root = '.' }) {
         discovery_successes: discoverySuccesses,
         discovery_attempts: discoveryAttempts,
         discovery_success_ratio: Number(discoverySuccessRatio.toFixed(4)),
-        minimum_discovery_success_ratio: minimumDiscoverySuccessRatio
+        minimum_discovery_success_ratio: minimumDiscoverySuccessRatio,
+        chart_integrity: chartIntegrity,
+        chart_complete_ratio: chartIntegrity.length ? Number((completeCharts / chartIntegrity.length).toFixed(4)) : 1
       },
       counts: {
         tracked_apps: tracked.size,

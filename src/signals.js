@@ -1,9 +1,30 @@
 function appKey(x) { return `${x.storefront}:${x.app_id}`; }
 
+function chartPresence(rows) {
+  const byType = new Map();
+  for (const row of rows) {
+    const type = row.chart_type ?? 'unknown';
+    if (!byType.has(type)) byType.set(type, []);
+    byType.get(type).push(row);
+  }
+  const result = {};
+  for (const [type, items] of byType) {
+    items.sort((a, b) => a.date.localeCompare(b.date));
+    result[type] = {
+      days: new Set(items.map((x) => x.date)).size,
+      first_position: items[0]?.position ?? null,
+      latest_position: items.at(-1)?.position ?? null,
+      best_position: Math.min(...items.map((x) => x.position)),
+      worst_position: Math.max(...items.map((x) => x.position))
+    };
+  }
+  return result;
+}
+
 export function buildSignals(history) {
   const perApp = new Map();
   for (const day of history) {
-    for (const app of day.apps) {
+    for (const app of day.apps ?? []) {
       const key = appKey(app);
       if (!perApp.has(key)) perApp.set(key, []);
       perApp.get(key).push({ date: day.date, ...app });
@@ -16,7 +37,7 @@ export function buildSignals(history) {
 
   for (const day of history) {
     const seenReviews = new Set();
-    for (const review of day.reviews) {
+    for (const review of day.reviews ?? []) {
       const key = appKey(review);
       if (!reviewsByApp.has(key)) reviewsByApp.set(key, []);
       const stable = `${key}:${review.review_id}`;
@@ -25,12 +46,12 @@ export function buildSignals(history) {
         seenReviews.add(stable);
       }
     }
-    for (const chart of day.charts) {
+    for (const chart of day.charts ?? []) {
       const key = appKey(chart);
       if (!chartsByApp.has(key)) chartsByApp.set(key, []);
-      chartsByApp.get(key).push({ date: day.date, position: chart.chart_position });
+      chartsByApp.get(key).push({ date: day.date, chart_type: chart.chart_type, position: chart.chart_position });
     }
-    for (const search of day.search) {
+    for (const search of day.search ?? []) {
       const key = appKey(search);
       if (!searchByApp.has(key)) searchByApp.set(key, []);
       searchByApp.get(key).push({ date: day.date, query: search.query, discovery_position: search.discovery_position });
@@ -53,10 +74,14 @@ export function buildSignals(history) {
       storefront: last.storefront,
       app_id: last.app_id,
       app_name: last.app_name,
+      price: last.price ?? null,
+      rating_count: last.rating_count ?? null,
+      initial_release_date: last.initial_release_date ?? null,
       rating_velocity: { delta: ratingDelta, from: first.date, to: last.date, confidence: rows.length > 1 ? 'normal' : 'low' },
       rating_acceleration: recent !== null && previous !== null ? recent - previous : null,
       review_velocity: { new_reviews: new Set(reviews.map((x) => x.id)).size, observed_days: new Set(reviews.map((x) => x.date)).size },
       chart_momentum: charts.length > 1 ? charts[0].position - charts.at(-1).position : null,
+      chart_presence: chartPresence(charts),
       release_velocity: { versions: new Set(rows.map((x) => x.version).filter(Boolean)).size },
       search_presence: {
         queries: [...new Set(searches.map((x) => x.query))],
