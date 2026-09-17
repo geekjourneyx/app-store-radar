@@ -1,0 +1,34 @@
+{
+  "date": "2026-09-17",
+  "successes": 215,
+  "source_success": {
+    "search": 45,
+    "chart": 5,
+    "lookup": 25,
+    "reviews": 140
+  },
+  "failures": [
+    {
+      "source": "chart",
+      "storefront": "us",
+      "chart_type": "top-free",
+      "error": "The operation was aborted due to timeout"
+    }
+  ],
+  "health": {
+    "discovery_successes": 50,
+    "discovery_attempts": 51,
+    "discovery_success_ratio": 0.9804,
+    "minimum_discovery_success_ratio": 0.8
+  },
+  "counts": {
+    "tracked_apps": 2362,
+    "review_watchlist_apps": 140,
+    "review_rows_fetched": 5790,
+    "reviews_new": 758,
+    "apps": 2362,
+    "search": 1960,
+    "reviews": 758,
+    "charts": 498
+  }
+}
