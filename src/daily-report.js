@@ -4,6 +4,7 @@ import { readHistory } from './storage.js';
 import { buildSignals } from './signals.js';
 import { extractReviewSignals } from './review-signals.js';
 import { evaluateCandidates } from './opportunities.js';
+import { inspectChartIntegrity } from './collect.js';
 
 function dateKey(date) {
   if (typeof date === 'string') return date.slice(0, 10);
@@ -100,7 +101,13 @@ export async function buildDailyEvidence({ root='.', date=new Date(), config={} 
 
   const reviewSignals = extractReviewSignals(current.reviews ?? []);
   const candidates = evaluateCandidates({ history: history.slice(0, index + 1), signals, config });
-  const chartIntegrity = current.manifest?.health?.chart_integrity ?? [];
+  const manifestIntegrity = current.manifest?.health?.chart_integrity;
+  const chartIntegrityStatus = Array.isArray(manifestIntegrity) ? 'manifest' : 'derived';
+  const chartIntegrity = Array.isArray(manifestIntegrity) ? manifestIntegrity : inspectChartIntegrity(current.charts ?? [], {
+    storefronts: config.storefronts ?? [...new Set((current.charts ?? []).map((x) => x.storefront))],
+    chartTypes: config.chart_types ?? [...new Set((current.charts ?? []).map((x) => x.chart_type))],
+    expectedCount: config.chart_expected_count ?? 100
+  });
 
   return {
     date: target,
@@ -108,6 +115,7 @@ export async function buildDailyEvidence({ root='.', date=new Date(), config={} 
     collection_health: {
       failures: current.manifest?.failures ?? [],
       chart_integrity: chartIntegrity,
+      chart_integrity_status: chartIntegrityStatus,
       chart_complete_ratio: current.manifest?.health?.chart_complete_ratio ?? null,
       reviews_new: current.manifest?.counts?.reviews_new ?? (current.reviews ?? []).length,
       review_watchlist_apps: current.manifest?.counts?.review_watchlist_apps ?? null
@@ -164,6 +172,7 @@ export function renderDailyMarkdown(e) {
   ];
   const incomplete = e.collection_health.chart_integrity.filter((x) => !x.complete);
   lines.push(`- Incomplete charts: **${incomplete.length}**`);
+  if (e.collection_health.chart_integrity_status === 'derived') lines.push('- Chart integrity was **derived from raw chart rows** because the legacy manifest lacks chart integrity metadata.');
   for (const item of incomplete) lines.push(`  - ${item.storefront}/${item.chart_type}: ${item.observed_count}/${item.expected_count}; missing ${item.missing_positions.join(', ') || 'unknown'}`);
 
   lines.push('', '## China Paid Chart — Top 20', '');
