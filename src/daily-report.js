@@ -48,12 +48,14 @@ export async function buildDailyEvidence({ root='.', date=new Date(), config={} 
     err.code = 'MISSING_DAILY_PARTITION';
     throw err;
   }
+
   const current = history[index];
   const previous = index > 0 ? history[index - 1] : null;
   const currentApps = appMap(current);
   const prevPaid = chartMap(previous, 'cn', 'top-paid');
   const signals = buildSignals(history.slice(0, index + 1));
   const signalMap = new Map(signals.map((x) => [x.key, x]));
+
   const paidRows = (current.charts ?? [])
     .filter((x) => x.storefront === 'cn' && x.chart_type === 'top-paid')
     .sort((a, b) => a.chart_position - b.chart_position)
@@ -140,9 +142,9 @@ export async function buildDailyEvidence({ root='.', date=new Date(), config={} 
       reviews: `data/${target.slice(0,4)}/${target.slice(5,7)}/${target.slice(8,10)}/reviews.ndjson`,
       manifest: `data/${target.slice(0,4)}/${target.slice(5,7)}/${target.slice(8,10)}/manifest.json`
     },
-    agent_handoff: {
+    research_handoff: {
       requires_external_validation: true,
-      final_decision_rule: 'Do not promote a machine candidate to BUILD until chart persistence, review evidence, commercial plausibility, counter-evidence, and iOS-native feasibility are externally validated.'
+      final_decision_rule: 'Machine triage never equals a product decision. Validate concrete JTBD, competition, monetization, counter-evidence, and implementation constraints before BUILD.'
     }
   };
 }
@@ -158,58 +160,102 @@ function mdTable(headers, rows) {
 }
 
 export function renderDailyMarkdown(e) {
+  const incomplete = e.collection_health.chart_integrity.filter((x) => !x.complete);
+  const researchQueue = e.machine_candidates
+    .filter((x) => x.candidate_type === 'product-candidate')
+    .slice(0, 5);
+  const marketSignals = e.machine_candidates
+    .filter((x) => x.candidate_type === 'market-signal')
+    .slice(0, 6);
+  const specificReviewEvidence = e.review_signals.items
+    .filter((x) => x.specificity === 'specific' && x.intent !== 'value')
+    .slice(0, 8);
+  const chartChanges = [
+    ...e.cn_paid.new_entrants
+      .filter((x) => Number(x.rating_count ?? Infinity) <= 500)
+      .slice(0, 4)
+      .map((x) => ({ type:'new', ...x })),
+    ...e.cn_paid.movers
+      .filter((x) => Math.abs(x.delta ?? 0) >= 20)
+      .slice(0, 4)
+      .map((x) => ({ type:'move', ...x }))
+  ].slice(0, 8);
+  const persistentMicro = e.small_developer_signals
+    .filter((x) => x.paid_chart_days >= 3)
+    .slice(0, 8);
+
   const lines = [
     `# App Store Radar Daily — ${e.date}`,
     '',
-    '> Deterministic evidence brief. BUILD decisions require ChatGPT/web validation and the iOS Native Design gate.',
+    '> Compact deterministic brief. Final BUILD/WATCH/REJECT requires current external validation.',
     '',
-    '## Collection Health',
+    '## Data Health',
     '',
-    `- China paid observed: **${e.cn_paid.observed_count}**`,
-    `- New reviews captured: **${e.collection_health.reviews_new ?? 'unknown'}**`,
-    `- Review watchlist apps: **${e.collection_health.review_watchlist_apps ?? 'unknown'}**`,
-    `- Source failures: **${e.collection_health.failures.length}**`,
+    mdTable(
+      ['CN paid', 'New reviews', 'Watchlist apps', 'Source failures', 'Incomplete charts'],
+      [[e.cn_paid.observed_count, e.collection_health.reviews_new ?? 'unknown', e.collection_health.review_watchlist_apps ?? 'unknown', e.collection_health.failures.length, incomplete.length]]
+    )
   ];
-  const incomplete = e.collection_health.chart_integrity.filter((x) => !x.complete);
-  lines.push(`- Incomplete charts: **${incomplete.length}**`);
-  if (e.collection_health.chart_integrity_status === 'derived') lines.push('- Chart integrity was **derived from raw chart rows** because the legacy manifest lacks chart integrity metadata.');
-  for (const item of incomplete) lines.push(`  - ${item.storefront}/${item.chart_type}: ${item.observed_count}/${item.expected_count}; missing ${item.missing_positions.join(', ') || 'unknown'}`);
 
-  lines.push('', '## China Paid Chart — Top 20', '');
+  if (incomplete.length) {
+    for (const item of incomplete) lines.push(`- ${item.storefront}/${item.chart_type}: ${item.observed_count}/${item.expected_count}; missing ${item.missing_positions.join(', ') || 'unknown'}`);
+    lines.push('');
+  }
+  if (e.collection_health.chart_integrity_status === 'derived') {
+    lines.push('- Chart integrity was derived from raw chart rows because the manifest lacked integrity metadata.', '');
+  }
+
+  lines.push('## Opportunity Research Queue', '');
+  if (!researchQueue.length) lines.push('_No product-specific candidate clears deterministic research gates today._', '');
+  else lines.push(mdTable(
+    ['Triage', 'JTBD', 'Requests/Pain', 'Apps', 'Days', 'Score'],
+    researchQueue.map((c) => [c.verdict, c.inferred.underlying_job, c.computed.gap_observations, c.computed.cross_apps, c.computed.persistence_days, c.score])
+  ), '');
+
+  lines.push('## Market Signals — Not Product Ideas', '');
+  if (!marketSignals.length) lines.push('_None._', '');
+  else lines.push(mdTable(
+    ['Signal', 'Observations', 'Apps', 'Days', 'Triage'],
+    marketSignals.map((c) => [c.inferred.underlying_job, c.computed.demand_observations, c.computed.cross_apps, c.computed.persistence_days, c.verdict])
+  ), '');
+
+  lines.push('## Paid-chart Signals Worth Looking At', '');
   lines.push(mdTable(
-    ['Rank', 'App', 'Δ vs prev', 'Price', 'Ratings'],
-    e.cn_paid.top20.map((x) => [x.rank, x.app_name, x.delta === null ? 'new/unknown' : (x.delta > 0 ? `+${x.delta}` : x.delta), x.formatted_price ?? x.price, x.rating_count])
-  ));
+    ['Type', 'Rank', 'App', 'Move', 'Ratings', 'Price'],
+    chartChanges.map((x) => [x.type, x.rank, x.app_name, x.delta === null ? 'new' : (x.delta > 0 ? `+${x.delta}` : x.delta), x.rating_count, x.formatted_price ?? x.price])
+  ), '');
 
-  lines.push('## New Entrants', '');
-  lines.push(mdTable(['Rank', 'App', 'Price', 'Ratings'], e.cn_paid.new_entrants.slice(0, 20).map((x) => [x.rank, x.app_name, x.formatted_price ?? x.price, x.rating_count])));
-
-  lines.push('## Movers', '');
-  lines.push(mdTable(['Rank', 'App', 'Move'], e.cn_paid.movers.map((x) => [x.rank, x.app_name, x.delta > 0 ? `+${x.delta}` : x.delta])));
-
-  lines.push('## Small Developer Signals', '', '> Proxy only: low rating-count + paid-chart presence. This does **not** prove developer/team size.', '');
+  lines.push('## Persistent Low-rating-count Paid Apps', '', '> Discovery proxy only. Low rating count does not prove team size or revenue.', '');
   lines.push(mdTable(
-    ['Rank', 'App', 'Ratings', 'Paid days', 'Best', 'Signal'],
-    e.small_developer_signals.map((x) => [x.rank, x.app_name, x.rating_count, x.paid_chart_days, x.best_position, x.confidence])
-  ));
+    ['Rank', 'App', 'Ratings', 'Paid days', 'Best', 'Price'],
+    persistentMicro.map((x) => [x.rank, x.app_name, x.rating_count, x.paid_chart_days, x.best_position, x.formatted_price ?? x.price])
+  ), '');
 
-  lines.push('## Review Signals', '');
-  if (!e.review_signals.counts.length) lines.push('_No deterministic review signals today._', '');
+  lines.push('## Specific Review Evidence', '');
+  if (!specificReviewEvidence.length) lines.push('_No specific pain/request evidence captured today._', '');
   else {
-    lines.push(mdTable(['Intent', 'Job', 'Count'], e.review_signals.counts.map((x) => [x.intent, x.job, x.count])));
-    for (const item of e.review_signals.items.slice(0, 20)) {
+    for (const item of specificReviewEvidence) {
       lines.push(`- **${item.intent} · ${item.job}** — app ${item.app_id}, review ${item.review_id}, rating ${item.rating ?? '—'}: ${item.evidence_excerpt}`);
     }
     lines.push('');
   }
 
-  lines.push('## Machine Opportunity Triage', '', '> These are candidates for research, not final product recommendations.', '');
-  if (!e.machine_candidates.length) lines.push('_None._', '');
-  for (const c of e.machine_candidates.slice(0, 10)) {
-    lines.push(`### ${c.verdict} · ${c.inferred.underlying_job}`, '', `- Score: ${c.score}`, `- Demand observations: ${c.computed.demand_observations}`, `- Cross-app evidence: ${c.computed.cross_apps}`, `- Persistence dates: ${c.computed.persistence_days}`, `- Noise: ${c.noise_flags.join(', ') || 'none'}`, '');
-  }
+  lines.push(
+    '## Evidence Chain',
+    '',
+    `- Raw partition: \`${e.evidence_chain.raw_partition}\``,
+    `- Charts: \`${e.evidence_chain.charts}\``,
+    `- Apps: \`${e.evidence_chain.apps}\``,
+    `- Reviews: \`${e.evidence_chain.reviews}\``,
+    `- Manifest: \`${e.evidence_chain.manifest}\``,
+    '',
+    '## Research Handoff',
+    '',
+    '- External validation required: **yes**',
+    `- ${e.research_handoff.final_decision_rule}`,
+    ''
+  );
 
-  lines.push('## Evidence Chain', '', `- Raw partition: \`${e.evidence_chain.raw_partition}\``, `- Charts: \`${e.evidence_chain.charts}\``, `- Apps: \`${e.evidence_chain.apps}\``, `- Reviews: \`${e.evidence_chain.reviews}\``, `- Manifest: \`${e.evidence_chain.manifest}\``, '', '## Agent Handoff', '', `- External validation required: **yes**`, `- ${e.agent_handoff.final_decision_rule}`, '');
   return lines.join('\n') + '\n';
 }
 
