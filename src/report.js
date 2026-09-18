@@ -16,7 +16,8 @@ function isoWeek(date) {
 
 function windowThrough(history, date, days=7) {
   const end = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const start = new Date(end); start.setUTCDate(start.getUTCDate() - (days - 1));
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
   return history.filter((x) => {
     const d = new Date(`${x.date}T00:00:00Z`);
     return d >= start && d <= end;
@@ -39,9 +40,24 @@ function reviewSummary(history) {
       count: items.length,
       apps: new Set(items.map((x) => `${x.storefront}:${x.app_id}`)).size,
       dates: new Set(items.map((x) => x.date)).size,
-      evidence: items.slice(0, 5).map((x) => ({ review_id:x.review_id, app_id:x.app_id, storefront:x.storefront, excerpt:x.evidence_excerpt }))
+      evidence: items.slice(0, 5).map((x) => ({
+        review_id: x.review_id,
+        app_id: x.app_id,
+        storefront: x.storefront,
+        specificity: x.specificity,
+        excerpt: x.evidence_excerpt
+      }))
     };
   }).sort((a, b) => b.count - a.count || a.job.localeCompare(b.job));
+}
+
+function mdTable(headers, rows) {
+  if (!rows.length) return '_None._\n';
+  return [
+    `| ${headers.join(' | ')} |`,
+    `| ${headers.map(() => '---').join(' | ')} |`,
+    ...rows.map((row) => `| ${row.map((x) => String(x ?? '—').replace(/\|/g, '\\|')).join(' | ')} |`)
+  ].join('\n') + '\n';
 }
 
 export async function buildWeeklyEvidence({ root='.', date=new Date(), config }) {
@@ -51,9 +67,17 @@ export async function buildWeeklyEvidence({ root='.', date=new Date(), config })
   const candidates = evaluateCandidates({ history, signals, config });
   const paidSignals = signals
     .filter((x) => x.storefront === 'cn' && x.chart_presence?.['top-paid'])
-    .map((x) => ({ app_id:x.app_id, app_name:x.app_name, rating_count:x.rating_count, price:x.price, ...x.chart_presence['top-paid'], rating_delta:x.rating_velocity.delta }))
+    .map((x) => ({
+      app_id:x.app_id,
+      app_name:x.app_name,
+      rating_count:x.rating_count,
+      price:x.price,
+      ...x.chart_presence['top-paid'],
+      rating_delta:x.rating_velocity.delta
+    }))
     .sort((a, b) => b.days - a.days || a.latest_position - b.latest_position)
     .slice(0, 30);
+
   return {
     week: isoWeek(date),
     generated_at: date.toISOString(),
@@ -70,34 +94,63 @@ export async function buildWeeklyEvidence({ root='.', date=new Date(), config })
 }
 
 export function renderWeeklyMarkdown(e) {
-  const groups = { BUILD: [], WATCH: [], REJECT: [] };
-  for (const c of e.candidates) groups[c.verdict].push(c);
+  const productCandidates = (e.candidates ?? []).filter((c) => c.candidate_type === 'product-candidate').slice(0, 10);
+  const marketSignals = (e.candidates ?? []).filter((c) => c.candidate_type === 'market-signal').slice(0, 8);
+  const rejected = (e.candidates ?? []).filter((c) => c.verdict === 'REJECT').slice(0, 5);
+  const reviewGaps = (e.review_signal_summary ?? []).filter((x) => x.intent !== 'value').slice(0, 10);
+
   const lines = [
     `# App Store Opportunity Radar — ${e.week}`,
     '',
-    `History days: **${e.history_days}** · Partial collection days: **${e.collection_health.partial_days}**`,
+    `History days: **${e.history_days}** · Partial collection days: **${e.collection_health?.partial_days ?? 0}** · Incomplete chart days: **${e.collection_health?.incomplete_chart_days ?? 0}**`,
     '',
-    '> Evidence first. Search positions are discovery positions, not real App Store keyword ranks. Machine BUILD is a research promotion, not an autonomous shipping decision.',
+    '> Deterministic weekly baseline. Search positions are discovery positions, not real App Store keyword ranks. Final BUILD/WATCH/REJECT belongs to externally validated research.',
     '',
-    '## Persistent China Paid Signals',
+    '## Product-specific Research Queue',
     ''
   ];
-  if (!e.persistent_cn_paid?.length) lines.push('_None._', '');
-  else for (const x of e.persistent_cn_paid.slice(0, 15)) lines.push(`- #${x.latest_position} **${x.app_name}** — ${x.days} observed days, best #${x.best_position}, ratings ${x.rating_count ?? '—'}, rating Δ ${x.rating_delta ?? '—'}`);
 
-  lines.push('', '## Review Signal Clusters', '');
-  if (!e.review_signal_summary?.length) lines.push('_None._', '');
-  else for (const x of e.review_signal_summary.slice(0, 15)) lines.push(`- **${x.intent} · ${x.job}** — ${x.count} signals / ${x.apps} apps / ${x.dates} dates`);
-  lines.push('');
+  if (!productCandidates.length) lines.push('_No product-specific candidate clears INVESTIGATE/WATCH triage in this window._', '');
+  else lines.push(mdTable(
+    ['Triage', 'JTBD', 'Requests/Pain', 'Apps', 'Dates', 'Score'],
+    productCandidates.map((c) => [c.verdict, c.inferred.underlying_job, c.computed.gap_observations, c.computed.cross_apps, c.computed.persistence_days, c.score])
+  ), '');
 
-  for (const verdict of ['BUILD', 'WATCH', 'REJECT']) {
-    lines.push(`## ${verdict}`, '');
-    if (!groups[verdict].length) { lines.push('_None._', ''); continue; }
-    for (const c of groups[verdict]) {
-      lines.push(`### ${c.inferred.underlying_job}`, '', `Score: **${c.score}**`, '', `- Observed: ${c.observed.review_ids.length} matched reviews across ${c.computed.cross_apps} apps and ${c.computed.persistence_days} dates.`, `- Computed: gap observations ${c.computed.gap_observations}; demand observations ${c.computed.demand_observations}.`, `- Inferred: ${c.inferred.adjacent_jobs.join(', ') || 'No adjacent jobs inferred deterministically.'}`, `- Noise flags: ${c.noise_flags.join(', ') || 'none'}`, `- Gates: ${Object.entries(c.gates).map(([k,v]) => `${k}=${v ? 'pass' : 'fail'}`).join(', ')}`, '', '### Feasibility / counter-evidence', '', '- External Apple/platform/legal/competitive validation is required before final BUILD.', '- When a BUILD is promoted to an iOS product issue, apply the ios-native-design screen contract, native-component-first rule, accessibility/runtime evidence, Device Hub verification, and Design DoD.', '');
-    }
-  }
-  lines.push('## Evidence Chain', '', `- Window: ${e.date_range ? `${e.date_range.from} → ${e.date_range.to}` : 'no data'}`, '- Raw evidence: `data/YYYY/MM/DD/`', '- Weekly machine evidence: `evidence/weekly/<week>.json`', '- Final agent research belongs in `research/weekly/<week>.md`.', '');
+  lines.push('## Market Signals — Not Standalone Product Ideas', '');
+  lines.push(mdTable(
+    ['Signal', 'Observations', 'Apps', 'Dates', 'Triage'],
+    marketSignals.map((c) => [c.inferred.underlying_job, c.computed.demand_observations, c.computed.cross_apps, c.computed.persistence_days, c.verdict])
+  ), '');
+
+  lines.push('## Persistent China Paid Signals', '');
+  lines.push(mdTable(
+    ['Latest', 'App', 'Observed days', 'Best', 'Ratings', 'Rating Δ'],
+    (e.persistent_cn_paid ?? []).slice(0, 12).map((x) => [x.latest_position, x.app_name, x.days, x.best_position, x.rating_count ?? '—', x.rating_delta ?? '—'])
+  ), '');
+
+  lines.push('## Review Gap Clusters', '');
+  lines.push(mdTable(
+    ['Intent', 'Job', 'Signals', 'Apps', 'Dates'],
+    reviewGaps.map((x) => [x.intent, x.job, x.count, x.apps, x.dates])
+  ), '');
+
+  lines.push('## Rejected Noise', '');
+  if (!rejected.length) lines.push('_None._', '');
+  else lines.push(mdTable(
+    ['Signal', 'Reason', 'Noise flags'],
+    rejected.map((c) => [c.inferred.underlying_job, c.candidate_type, c.noise_flags.join(', ') || 'not a standalone opportunity'])
+  ), '');
+
+  lines.push(
+    '## Evidence Chain',
+    '',
+    `- Window: ${e.date_range ? `${e.date_range.from} → ${e.date_range.to}` : 'no data'}`,
+    '- Raw evidence: `data/YYYY/MM/DD/`',
+    '- Weekly machine evidence: `evidence/weekly/<week>.json`',
+    '- Final externally validated research: `research/weekly/<week>.md`',
+    ''
+  );
+
   return lines.join('\n') + '\n';
 }
 
