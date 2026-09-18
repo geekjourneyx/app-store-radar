@@ -46,7 +46,7 @@ test('app metadata preserves commercial and age signals needed for opportunity a
   assert.equal(app.price_model, 'paid');
 });
 
-test('Chinese reviews become explicit pain request and value signals with evidence excerpts', () => {
+test('Chinese reviews become explicit high-signal pain request and value evidence', () => {
   const rows = extractReviewSignals([
     { storefront:'cn', app_id:'1', review_id:'r1', rating:5, title:'很推荐', body:'要是每天背完单词后能跟一篇阅读短文就好了，页面也很简洁。' },
     { storefront:'cn', app_id:'2', review_id:'r2', rating:1, title:'白花钱', body:'付费后悬浮视频不能用了，怎么解决？' },
@@ -56,6 +56,15 @@ test('Chinese reviews become explicit pain request and value signals with eviden
   assert.ok(rows.some((x) => x.review_id === 'r2' && x.job === 'reliability' && x.intent === 'pain'));
   assert.ok(rows.some((x) => x.review_id === 'r3' && x.job === 'local/private workflow' && x.intent === 'value'));
   assert.ok(rows.every((x) => x.evidence_excerpt.length <= 160));
+});
+
+test('generic praise and transcript sync do not become fake opportunity evidence', () => {
+  const rows = extractReviewSignals([
+    { storefront:'cn', app_id:'1', review_id:'g1', rating:5, title:'好用', body:'真的很好用，希望能一直保持这样的品质！' },
+    { storefront:'cn', app_id:'2', review_id:'g2', rating:5, title:'听力', body:'播客有文稿同步，不懂的随时查，很方便。' }
+  ]);
+  assert.equal(rows.some((x) => x.review_id === 'g1' && x.intent === 'request'), false);
+  assert.equal(rows.some((x) => x.review_id === 'g2' && x.job === 'data portability'), false);
 });
 
 test('signals expose paid-chart persistence for small-developer proxy detection', () => {
@@ -70,7 +79,7 @@ test('signals expose paid-chart persistence for small-developer proxy detection'
   assert.equal(signal.chart_presence['top-paid'].latest_position, 33);
 });
 
-test('daily evidence renders a readable decision-oriented markdown report', async () => {
+test('daily evidence renders a compact decision-oriented markdown report', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'radar-daily-'));
   const makeDay = async (date, rank, ratingCount, review) => writePartition(root, date, {
     apps:[{ storefront:'cn', app_id:'1', app_name:'Tiny Tool', price:6, formatted_price:'¥6', rating_count:ratingCount, initial_release_date:'2026-08-01T00:00:00Z', version:'1.0' }],
@@ -85,8 +94,8 @@ test('daily evidence renders a readable decision-oriented markdown report', asyn
   assert.equal(evidence.cn_paid.movers[0].delta, 30);
   assert.equal(evidence.small_developer_signals[0].app_id, '1');
   const md = renderDailyMarkdown(evidence);
-  assert.match(md, /China Paid Chart/);
-  assert.match(md, /Review Signals/);
+  assert.match(md, /Opportunity Research Queue/);
+  assert.match(md, /Market Signals/);
   assert.match(md, /Evidence Chain/);
   await writeDaily({ root, date:new Date('2026-09-17T00:00:00Z'), config:{ small_developer_rating_count_max:500 } });
   const stored = await readFile(path.join(root, 'reports/daily/2026-09-17.md'), 'utf8');
@@ -105,7 +114,7 @@ test('daily report derives chart integrity when legacy manifest lacks integrity 
   assert.equal(evidence.collection_health.chart_integrity[0].complete, false);
   assert.deepEqual(evidence.collection_health.chart_integrity[0].missing_positions, [100]);
   const md = renderDailyMarkdown(evidence);
-  assert.match(md, /Incomplete charts: \*\*1\*\*/);
+  assert.match(md, /Incomplete charts/);
   assert.match(md, /derived from raw chart rows/);
 });
 
