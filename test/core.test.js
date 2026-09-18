@@ -44,11 +44,11 @@ test('version incident is never promoted', () => {
   const history = [{ date: '2026-09-01', reviews: [1,2,3,4].map((i) => ({ storefront:'us', app_id:'1', review_id:`r${i}`, title:'Crash', body:'crash login broken' })) }];
   const result = evaluateCandidates({ history, signals: [], config: { thresholds: { min_demand:2, min_gap:2, min_cross_apps:2, min_persistence_days:2 } } });
   const candidate = result.find((x) => x.inferred.underlying_job === 'reliability');
-  assert.notEqual(candidate.verdict, 'BUILD');
+  assert.notEqual(candidate.verdict, 'INVESTIGATE');
   assert.ok(candidate.noise_flags.includes('VERSION_INCIDENT'));
 });
 
-test('persistent cross-app portability gap can be BUILD', () => {
+test('persistent cross-app portability gap remains a market signal, not a product decision', () => {
   const history = [
     { date:'2026-09-01', reviews:[
       { storefront:'us', app_id:'1', review_id:'a', title:'Export', body:'please export markdown' },
@@ -60,11 +60,12 @@ test('persistent cross-app portability gap can be BUILD', () => {
   ];
   const result = evaluateCandidates({ history, signals: [], config: { thresholds: { min_demand:2, min_gap:2, min_cross_apps:2, min_persistence_days:2 } } });
   const candidate = result.find((x) => x.inferred.underlying_job === 'data portability');
-  assert.equal(candidate.verdict, 'BUILD');
+  assert.equal(candidate.verdict, 'WATCH');
+  assert.equal(candidate.candidate_type, 'market-signal');
 });
 
 test('zero-opportunity report is honest', () => {
-  const markdown = renderWeeklyMarkdown({ week:'2026-W37', history_days:7, collection_health:{ partial_days:0 }, candidates:[] });
-  assert.match(markdown, /## BUILD\n\n_None\._/);
+  const markdown = renderWeeklyMarkdown({ week:'2026-W37', history_days:7, collection_health:{ partial_days:0, incomplete_chart_days:0 }, candidates:[] });
+  assert.match(markdown, /No product-specific candidate clears/);
   assert.match(markdown, /not real App Store keyword ranks/);
 });
