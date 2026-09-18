@@ -9,7 +9,7 @@ const RULES = [
     job: 'data portability',
     category: 'integration gap',
     intent: 'request',
-    re: /(导出|导入|同步|跨设备|文件|本地文件|markdown|obsidian|logseq|\bapi\b|\bexport\b|\bimport\b|\bsync\b|local files?)/i
+    re: /(导出|导入|跨设备.{0,8}(同步|迁移)|数据.{0,6}(同步|迁移)|iCloud.{0,8}同步|本地文件|markdown|obsidian|logseq|\bapi\b|\bexport\b|\bimport\b|data portability|local files?|sync.{0,12}(devices?|icloud))/i
   },
   {
     job: 'affordable ownership',
@@ -27,7 +27,13 @@ const RULES = [
     job: 'ad-free experience',
     category: 'monetization gap',
     intent: 'pain',
-    re: /(广告越来越多|强制.{0,4}广告|播放广告|看广告|ad(s)?)/i
+    re: /(广告越来越多|强制.{0,4}广告|播放广告|看广告|弹窗广告|\bads?\b)/i
+  },
+  {
+    job: 'ad-free experience',
+    category: 'monetization value',
+    intent: 'value',
+    re: /(无广告|没有广告|不含广告|ad[- ]free|no ads)/i
   },
   {
     job: 'reliability',
@@ -39,13 +45,15 @@ const RULES = [
     job: 'focused workflow',
     category: 'feature request',
     intent: 'request',
-    re: /(希望|要是|能不能|建议|增加|支持|最好|wish|please add|feature request)/i
+    generic: true,
+    re: /(希望.{0,16}(增加|支持|加入|提供|新增)|建议.{0,12}(增加|支持|加入|提供|新增)|能不能.{0,12}(增加|支持|加入|导出|导入)|please add|feature request|wish.{0,20}(support|add|export|import))/i
   },
   {
     job: 'focused workflow',
     category: 'product value',
     intent: 'value',
-    re: /(简洁|清爽|纯粹|功能.{0,4}(够用|很多)|很好用|好用|simple|clean|focused)/i
+    generic: true,
+    re: /(简洁|清爽|纯粹|不冗余|功能.{0,5}(够用|精简)|simple.{0,12}(workflow|interface)|clean.{0,12}(interface|workflow)|focused workflow|minimal)/i
   }
 ];
 
@@ -55,8 +63,11 @@ function excerpt(review, max = 160) {
 }
 
 function inferIntent(rule, review) {
-  if (rule.intent === 'value' && Number(review.rating) <= 2) return 'pain';
-  if (rule.intent === 'pain' && Number(review.rating) >= 4 && /(希望|建议|要是|wish|please)/i.test(`${review.title} ${review.body}`)) return 'request';
+  const text = `${review.title ?? ''} ${review.body ?? ''}`;
+  const rating = Number(review.rating);
+  if (rule.job === 'affordable ownership' && rating >= 4 && /(买断|终身|one[- ]time|lifetime)/i.test(text)) return 'value';
+  if (rule.intent === 'value' && rating <= 2) return 'pain';
+  if (rule.intent === 'pain' && rating >= 4 && /(希望|建议|要是|wish|please)/i.test(text)) return 'request';
   return rule.intent;
 }
 
@@ -64,8 +75,16 @@ export function extractReviewSignals(reviews = []) {
   const out = [];
   for (const review of reviews) {
     const text = `${review.title ?? ''} ${review.body ?? ''}`;
-    for (const rule of RULES) {
-      if (!rule.re.test(text)) continue;
+    const matches = RULES.filter((rule) => rule.re.test(text));
+    const hasSpecific = matches.some((rule) => !rule.generic);
+    const selected = hasSpecific ? matches.filter((rule) => !rule.generic) : matches;
+    const seen = new Set();
+
+    for (const rule of selected) {
+      const intent = inferIntent(rule, review);
+      const key = `${rule.job}:${intent}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       out.push({
         storefront: review.storefront,
         app_id: review.app_id,
@@ -74,7 +93,8 @@ export function extractReviewSignals(reviews = []) {
         created_at: review.created_at ?? null,
         job: rule.job,
         category: rule.category,
-        intent: inferIntent(rule, review),
+        intent,
+        specificity: rule.generic ? 'generic' : 'specific',
         evidence_excerpt: excerpt(review)
       });
     }
