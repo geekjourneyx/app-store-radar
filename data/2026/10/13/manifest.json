@@ -1,0 +1,94 @@
+{
+  "date": "2026-10-13",
+  "successes": 307,
+  "source_success": {
+    "search": 43,
+    "chart": 6,
+    "lookup": 25,
+    "reviews": 233
+  },
+  "failures": [
+    {
+      "source": "search",
+      "storefront": "jp",
+      "query": "sleep tracker",
+      "error": "HTTP 429 for https://itunes.apple.com/search?term=sleep+tracker&entity=software&country=jp&limit=50"
+    },
+    {
+      "source": "search",
+      "storefront": "jp",
+      "query": "fitness",
+      "error": "HTTP 429 for https://itunes.apple.com/search?term=fitness&entity=software&country=jp&limit=50"
+    }
+  ],
+  "health": {
+    "discovery_successes": 49,
+    "discovery_attempts": 51,
+    "discovery_success_ratio": 0.9608,
+    "minimum_discovery_success_ratio": 0.8,
+    "chart_integrity": [
+      {
+        "storefront": "us",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "us",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "cn",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "cn",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "jp",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "jp",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 98,
+        "missing_positions": [
+          99,
+          100
+        ],
+        "complete": false
+      }
+    ],
+    "chart_complete_ratio": 0.8333
+  },
+  "counts": {
+    "tracked_apps": 2381,
+    "review_watchlist_apps": 233,
+    "review_rows_fetched": 8415,
+    "reviews_new": 1347,
+    "apps": 2381,
+    "search": 1867,
+    "reviews": 1347,
+    "charts": 598
+  }
+}
