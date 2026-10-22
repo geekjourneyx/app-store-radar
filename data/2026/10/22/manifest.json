@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-22",
+  "successes": 312,
+  "source_success": {
+    "search": 45,
+    "chart": 6,
+    "lookup": 26,
+    "reviews": 235
+  },
+  "failures": [],
+  "health": {
+    "discovery_successes": 51,
+    "discovery_attempts": 51,
+    "discovery_success_ratio": 1,
+    "minimum_discovery_success_ratio": 0.8,
+    "chart_integrity": [
+      {
+        "storefront": "us",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "us",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "cn",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "cn",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "jp",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "jp",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 96,
+        "missing_positions": [
+          97,
+          98,
+          99,
+          100
+        ],
+        "complete": false
+      }
+    ],
+    "chart_complete_ratio": 0.8333
+  },
+  "counts": {
+    "tracked_apps": 2468,
+    "review_watchlist_apps": 235,
+    "review_rows_fetched": 10280,
+    "reviews_new": 1120,
+    "apps": 2464,
+    "search": 1966,
+    "reviews": 1120,
+    "charts": 596
+  }
+}
