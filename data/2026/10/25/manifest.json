@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-25",
+  "successes": 308,
+  "source_success": {
+    "search": 44,
+    "chart": 6,
+    "lookup": 25,
+    "reviews": 233
+  },
+  "failures": [
+    {
+      "source": "search",
+      "storefront": "jp",
+      "query": "fitness",
+      "error": "HTTP 429 for https://itunes.apple.com/search?term=fitness&entity=software&country=jp&limit=50"
+    }
+  ],
+  "health": {
+    "discovery_successes": 50,
+    "discovery_attempts": 51,
+    "discovery_success_ratio": 0.9804,
+    "minimum_discovery_success_ratio": 0.8,
+    "chart_integrity": [
+      {
+        "storefront": "us",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "us",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "cn",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "cn",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "jp",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "jp",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 97,
+        "missing_positions": [
+          98,
+          99,
+          100
+        ],
+        "complete": false
+      }
+    ],
+    "chart_complete_ratio": 0.8333
+  },
+  "counts": {
+    "tracked_apps": 2415,
+    "review_watchlist_apps": 233,
+    "review_rows_fetched": 9591,
+    "reviews_new": 1311,
+    "apps": 2415,
+    "search": 1906,
+    "reviews": 1311,
+    "charts": 597
+  }
+}
