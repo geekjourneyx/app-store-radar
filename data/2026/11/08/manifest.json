@@ -1,0 +1,88 @@
+{
+  "date": "2026-11-08",
+  "successes": 310,
+  "source_success": {
+    "search": 44,
+    "chart": 6,
+    "lookup": 26,
+    "reviews": 234
+  },
+  "failures": [
+    {
+      "source": "search",
+      "storefront": "cn",
+      "query": "calendar",
+      "error": "HTTP 404 for https://itunes.apple.com/search?term=calendar&entity=software&country=cn&limit=50"
+    }
+  ],
+  "health": {
+    "discovery_successes": 50,
+    "discovery_attempts": 51,
+    "discovery_success_ratio": 0.9804,
+    "minimum_discovery_success_ratio": 0.8,
+    "chart_integrity": [
+      {
+        "storefront": "us",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "us",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "cn",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "cn",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "jp",
+        "chart_type": "top-free",
+        "expected_count": 100,
+        "observed_count": 100,
+        "missing_positions": [],
+        "complete": true
+      },
+      {
+        "storefront": "jp",
+        "chart_type": "top-paid",
+        "expected_count": 100,
+        "observed_count": 98,
+        "missing_positions": [
+          99,
+          100
+        ],
+        "complete": false
+      }
+    ],
+    "chart_complete_ratio": 0.8333
+  },
+  "counts": {
+    "tracked_apps": 2436,
+    "review_watchlist_apps": 234,
+    "review_rows_fetched": 9659,
+    "reviews_new": 1337,
+    "apps": 2436,
+    "search": 1923,
+    "reviews": 1337,
+    "charts": 598
+  }
+}
